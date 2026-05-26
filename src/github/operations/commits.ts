@@ -1,4 +1,5 @@
 import { getOctokitClient } from "../client.js";
+import { mapToCommit, repoContext } from "../mappers.js";
 import { mapGitHubError } from "../../errors/index.js";
 import { withRetry } from "../../utils/retry.js";
 import { withOperationLogging } from "../../utils/logging.js";
@@ -71,7 +72,7 @@ export async function createCommit(
           author: newCommit.author?.name ?? null,
         };
       } catch (error) {
-        throw mapGitHubError(error, `El repositorio "${owner}/${repo}"`);
+        throw mapGitHubError(error, repoContext(owner, repo));
       }
     })
   );
@@ -96,12 +97,7 @@ export async function listCommits(
             ...(branch !== undefined && { sha: branch }),
             per_page: limit,
           });
-          return data.map((commit) => ({
-            sha: commit.sha,
-            message: commit.commit.message,
-            url: commit.html_url,
-            author: commit.commit.author?.name ?? null,
-          }));
+          return data.map(mapToCommit);
         } catch (error) {
           throw mapGitHubError(error, `El repositorio "${owner}/${repo}"`);
         }

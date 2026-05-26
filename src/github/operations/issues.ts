@@ -1,5 +1,10 @@
 import { getOctokitClient } from "../client.js";
-import { mapToIssue } from "../mappers.js";
+import {
+  mapToIssue,
+  mapToComment,
+  repoContext,
+  issueContext,
+} from "../mappers.js";
 import { mapGitHubError } from "../../errors/index.js";
 import { withRetry } from "../../utils/retry.js";
 import { withOperationLogging } from "../../utils/logging.js";
@@ -23,7 +28,7 @@ export async function createIssue(
         });
         return mapToIssue(data);
       } catch (error) {
-        throw mapGitHubError(error, `El repositorio "${owner}/${repo}"`);
+        throw mapGitHubError(error, repoContext(owner, repo));
       }
     })
   );
@@ -47,7 +52,7 @@ export async function listIssues(
         });
         return data.filter((issue) => !issue.pull_request).map(mapToIssue);
       } catch (error) {
-        throw mapGitHubError(error, `El repositorio "${owner}/${repo}"`);
+        throw mapGitHubError(error, repoContext(owner, repo));
       }
     })
   );
@@ -95,15 +100,9 @@ export async function addCommentToIssue(
             issue_number: issueNumber,
             body,
           });
-          return {
-            id: data.id,
-            body: data.body ?? "",
-            url: data.html_url,
-            author: data.user?.login ?? null,
-            createdAt: data.created_at,
-          };
+          return mapToComment(data);
         } catch (error) {
-          throw mapGitHubError(error, `El issue #${issueNumber} en "${owner}/${repo}"`);
+          throw mapGitHubError(error, issueContext(owner, repo, issueNumber));
         }
       })
   );
@@ -130,7 +129,7 @@ export async function assignIssue(
           });
           return mapToIssue(data);
         } catch (error) {
-          throw mapGitHubError(error, `El issue #${issueNumber} en "${owner}/${repo}"`);
+          throw mapGitHubError(error, issueContext(owner, repo, issueNumber));
         }
       })
   );

@@ -1,4 +1,5 @@
 import { getOctokitClient } from "../client.js";
+import { repoContext } from "../mappers.js";
 import { mapGitHubError } from "../../errors/index.js";
 import { withRetry } from "../../utils/retry.js";
 import { withOperationLogging } from "../../utils/logging.js";
@@ -18,30 +19,21 @@ export async function createBranch(
         try {
           const octokit = getOctokitClient();
 
-          let baseSha: string;
+          const refName =
+            fromBranch ??
+            (await octokit.repos.get({ owner, repo })).data.default_branch;
 
-          if (fromBranch !== undefined) {
-            const { data: refData } = await octokit.git.getRef({
-              owner,
-              repo,
-              ref: `heads/${fromBranch}`,
-            });
-            baseSha = refData.object.sha;
-          } else {
-            const { data: repoData } = await octokit.repos.get({ owner, repo });
-            const { data: refData } = await octokit.git.getRef({
-              owner,
-              repo,
-              ref: `heads/${repoData.default_branch}`,
-            });
-            baseSha = refData.object.sha;
-          }
+          const { data: refData } = await octokit.git.getRef({
+            owner,
+            repo,
+            ref: `heads/${refName}`,
+          });
 
           const { data } = await octokit.git.createRef({
             owner,
             repo,
             ref: `refs/heads/${branchName}`,
-            sha: baseSha,
+            sha: refData.object.sha,
           });
 
           return {
@@ -49,7 +41,7 @@ export async function createBranch(
             sha: data.object.sha,
           };
         } catch (error) {
-          throw mapGitHubError(error, `El repositorio "${owner}/${repo}"`);
+          throw mapGitHubError(error, repoContext(owner, repo));
         }
       })
   );

@@ -1,4 +1,5 @@
 import { getOctokitClient } from "../client.js";
+import { repoContext } from "../mappers.js";
 import { mapGitHubError } from "../../errors/index.js";
 import { withRetry } from "../../utils/retry.js";
 import { withOperationLogging } from "../../utils/logging.js";
@@ -23,7 +24,7 @@ export async function addCollaborator(
             permission,
           });
         } catch (error) {
-          throw mapGitHubError(error, `El repositorio "${owner}/${repo}"`);
+          throw mapGitHubError(error, repoContext(owner, repo));
         }
       })
   );

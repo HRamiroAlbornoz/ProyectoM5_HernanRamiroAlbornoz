@@ -1,5 +1,5 @@
 import { getOctokitClient } from "../client.js";
-import { normalizeIssueState } from "../mappers.js";
+import { normalizeIssueState, repoContext } from "../mappers.js";
 import { mapGitHubError } from "../../errors/index.js";
 import { withRetry } from "../../utils/retry.js";
 import { withOperationLogging } from "../../utils/logging.js";
@@ -38,7 +38,7 @@ export async function createPullRequest(
             targetBranch: data.base.ref,
           };
         } catch (error) {
-          throw mapGitHubError(error, `El repositorio "${owner}/${repo}"`);
+          throw mapGitHubError(error, repoContext(owner, repo));
         }
       })
   );
