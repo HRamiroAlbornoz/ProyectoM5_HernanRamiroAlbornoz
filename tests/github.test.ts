@@ -16,6 +16,10 @@ import {
   createBranch,
   listCommits,
   createCommit,
+  createPullRequest,
+  createLabel,
+  assignIssue,
+  addCollaborator,
 } from "../src/github/operations.js";
 
 const mockOctokit = {
@@ -439,6 +443,193 @@ describe("createBranch (casos de error)", () => {
       "mi-repo",
       "feature/nueva",
       "rama-inexistente"
+    ).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(GitHubAPIError);
+    expect((error as GitHubAPIError).retryable).toBe(false);
+  });
+});
+
+describe("createPullRequest", () => {
+  it("retorna el PR creado con los campos mapeados correctamente", async () => {
+    mockOctokit.pulls.create.mockResolvedValue({
+      data: {
+        id: 200,
+        number: 7,
+        title: "feat: nueva funcionalidad",
+        html_url: "https://github.com/usuario/mi-repo/pull/7",
+        state: "open",
+        head: { ref: "feature/nueva" },
+        base: { ref: "main" },
+      },
+    });
+
+    const result = await createPullRequest(
+      "usuario",
+      "mi-repo",
+      "feat: nueva funcionalidad",
+      "Descripción del PR",
+      "feature/nueva",
+      "main"
+    );
+
+    expect(result.number).toBe(7);
+    expect(result.title).toBe("feat: nueva funcionalidad");
+    expect(result.state).toBe("open");
+    expect(result.sourceBranch).toBe("feature/nueva");
+    expect(result.targetBranch).toBe("main");
+  });
+
+  it("falla con GitHubAPIError cuando una rama no existe (422)", async () => {
+    mockOctokit.pulls.create.mockRejectedValue({ status: 422 });
+
+    const error = await createPullRequest(
+      "usuario",
+      "mi-repo",
+      "título",
+      undefined,
+      "rama-inexistente",
+      "main"
+    ).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(GitHubAPIError);
+    expect((error as GitHubAPIError).retryable).toBe(false);
+  });
+});
+
+describe("createLabel", () => {
+  it("retorna el label creado con los campos mapeados correctamente", async () => {
+    mockOctokit.issues.createLabel.mockResolvedValue({
+      data: {
+        id: 300,
+        name: "bug",
+        color: "ff0000",
+        description: "Errores de la app",
+      },
+    });
+
+    const result = await createLabel(
+      "usuario",
+      "mi-repo",
+      "bug",
+      "ff0000",
+      "Errores de la app"
+    );
+
+    expect(result.id).toBe(300);
+    expect(result.name).toBe("bug");
+    expect(result.color).toBe("ff0000");
+    expect(result.description).toBe("Errores de la app");
+  });
+
+  it("retorna description: null cuando el label no tiene descripción", async () => {
+    mockOctokit.issues.createLabel.mockResolvedValue({
+      data: {
+        id: 301,
+        name: "wontfix",
+        color: "cccccc",
+        description: null,
+      },
+    });
+
+    const result = await createLabel("usuario", "mi-repo", "wontfix", "cccccc", undefined);
+
+    expect(result.description).toBeNull();
+  });
+
+  it("falla con GitHubAPIError cuando el label ya existe (422)", async () => {
+    mockOctokit.issues.createLabel.mockRejectedValue({ status: 422 });
+
+    const error = await createLabel(
+      "usuario",
+      "mi-repo",
+      "duplicado",
+      "ff0000",
+      undefined
+    ).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(GitHubAPIError);
+    expect((error as GitHubAPIError).retryable).toBe(false);
+  });
+});
+
+describe("assignIssue", () => {
+  it("retorna el issue con los assignees actualizados", async () => {
+    mockOctokit.issues.addAssignees.mockResolvedValue({
+      data: {
+        id: 1,
+        number: 10,
+        title: "Issue a asignar",
+        body: null,
+        state: "open",
+        html_url: "https://github.com/usuario/mi-repo/issues/10",
+        user: { login: "usuario" },
+        created_at: "2024-01-01T00:00:00Z",
+      },
+    });
+
+    const result = await assignIssue("usuario", "mi-repo", 10, [
+      "colaborador1",
+      "colaborador2",
+    ]);
+
+    expect(result.number).toBe(10);
+    expect(result.state).toBe("open");
+    expect(mockOctokit.issues.addAssignees).toHaveBeenCalledWith({
+      owner: "usuario",
+      repo: "mi-repo",
+      issue_number: 10,
+      assignees: ["colaborador1", "colaborador2"],
+    });
+  });
+
+  it("falla con GitHubAPIError cuando el issue no existe (404)", async () => {
+    mockOctokit.issues.addAssignees.mockRejectedValue({ status: 404 });
+
+    const error = await assignIssue("usuario", "mi-repo", 999, ["colab"]).catch(
+      (e: unknown) => e
+    );
+
+    expect(error).toBeInstanceOf(GitHubAPIError);
+    expect((error as GitHubAPIError).retryable).toBe(false);
+  });
+});
+
+describe("addCollaborator", () => {
+  it("llama a la API con los parámetros correctos", async () => {
+    mockOctokit.repos.addCollaborator.mockResolvedValue({ data: {} });
+
+    await addCollaborator("usuario", "mi-repo", "nuevo-colaborador", "push");
+
+    expect(mockOctokit.repos.addCollaborator).toHaveBeenCalledWith({
+      owner: "usuario",
+      repo: "mi-repo",
+      username: "nuevo-colaborador",
+      permission: "push",
+    });
+  });
+
+  it("acepta otros niveles de permiso", async () => {
+    mockOctokit.repos.addCollaborator.mockResolvedValue({ data: {} });
+
+    await addCollaborator("usuario", "mi-repo", "admin-user", "admin");
+
+    expect(mockOctokit.repos.addCollaborator).toHaveBeenCalledWith({
+      owner: "usuario",
+      repo: "mi-repo",
+      username: "admin-user",
+      permission: "admin",
+    });
+  });
+
+  it("falla con GitHubAPIError cuando el usuario no existe (404)", async () => {
+    mockOctokit.repos.addCollaborator.mockRejectedValue({ status: 404 });
+
+    const error = await addCollaborator(
+      "usuario",
+      "mi-repo",
+      "usuario-inexistente",
+      "push"
     ).catch((e: unknown) => e);
 
     expect(error).toBeInstanceOf(GitHubAPIError);
