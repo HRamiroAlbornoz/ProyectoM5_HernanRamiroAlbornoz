@@ -20,7 +20,7 @@ import {
   createLabel,
   assignIssue,
   addCollaborator,
-} from "../src/github/operations.js";
+} from "../src/github/operations/index.js";
 
 const mockOctokit = {
   repos: {

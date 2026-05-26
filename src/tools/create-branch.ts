@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createBranchSchema } from "../schemas/index.js";
-import { createBranch } from "../github/operations.js";
+import { createBranch } from "../github/operations/index.js";
 import { toToolError } from "../errors/index.js";
 import type { ToolResult } from "../types.js";
 

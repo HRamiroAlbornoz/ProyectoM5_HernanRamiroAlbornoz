@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { listRepositoriesSchema } from "../schemas/index.js";
-import { listRepositories } from "../github/operations.js";
+import { listRepositories } from "../github/operations/index.js";
 import { toToolError } from "../errors/index.js";
 import type { ToolResult } from "../types.js";
 

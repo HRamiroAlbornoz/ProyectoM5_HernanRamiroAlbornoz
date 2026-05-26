@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { addCollaboratorSchema } from "../schemas/index.js";
-import { addCollaborator } from "../github/operations.js";
+import { addCollaborator } from "../github/operations/index.js";
 import { toToolError } from "../errors/index.js";
 import type { ToolResult } from "../types.js";
 

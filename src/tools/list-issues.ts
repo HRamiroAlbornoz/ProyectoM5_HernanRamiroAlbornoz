@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { listIssuesSchema } from "../schemas/index.js";
-import { listIssues } from "../github/operations.js";
+import { listIssues } from "../github/operations/index.js";
 import { toToolError } from "../errors/index.js";
 import type { ToolResult } from "../types.js";
 
