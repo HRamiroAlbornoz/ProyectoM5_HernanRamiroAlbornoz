@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createCommitSchema } from "../schemas/index.js";
 import { createCommit } from "../github/operations.js";
-import { AppError } from "../errors/index.js";
+import { toToolError } from "../errors/index.js";
 import type { ToolResult } from "../types.js";
 
 export function registerCreateCommit(server: McpServer): void {
@@ -32,13 +32,7 @@ export function registerCreateCommit(server: McpServer): void {
           ],
         };
       } catch (error) {
-        const appError = error instanceof AppError ? error : new AppError(
-          "Error inesperado al crear el commit.",
-          "UNKNOWN_ERROR",
-          false,
-          "ESCALATE",
-          undefined
-        );
+        const appError = toToolError(error, "crear el commit");
         return {
           content: [{ type: "text", text: appError.message }],
           isError: true,

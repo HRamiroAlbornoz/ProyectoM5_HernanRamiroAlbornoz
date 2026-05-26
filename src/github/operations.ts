@@ -12,6 +12,50 @@ import type {
   GitHubComment,
 } from "../types.js";
 
+function mapToRepository(data: {
+  id: number;
+  name: string;
+  full_name: string;
+  description?: string | null;
+  html_url: string;
+  private: boolean;
+  default_branch: string;
+  created_at?: string | null;
+}): GitHubRepository {
+  return {
+    id: data.id,
+    name: data.name,
+    fullName: data.full_name,
+    description: data.description ?? null,
+    url: data.html_url,
+    isPrivate: data.private,
+    defaultBranch: data.default_branch,
+    createdAt: data.created_at ?? null,
+  };
+}
+
+function mapToIssue(data: {
+  id: number;
+  number: number;
+  title: string;
+  body?: string | null;
+  state: string;
+  html_url: string;
+  user?: { login: string } | null;
+  created_at: string;
+}): GitHubIssue {
+  return {
+    id: data.id,
+    number: data.number,
+    title: data.title,
+    body: data.body ?? null,
+    state: data.state,
+    url: data.html_url,
+    author: data.user?.login ?? null,
+    createdAt: data.created_at,
+  };
+}
+
 export async function createRepository(
   name: string,
   description: string | undefined,
@@ -27,16 +71,7 @@ export async function createRepository(
         private: isPrivate,
         auto_init: true,
       });
-      return {
-        id: data.id,
-        name: data.name,
-        fullName: data.full_name,
-        description: data.description ?? null,
-        url: data.html_url,
-        isPrivate: data.private,
-        defaultBranch: data.default_branch,
-        createdAt: data.created_at ?? null,
-      };
+      return mapToRepository(data);
     } catch (error) {
       throw mapGitHubError(error, `El repositorio "${name}"`);
     }
@@ -59,16 +94,7 @@ export async function createIssue(
         title,
         ...(body !== undefined && { body }),
       });
-      return {
-        id: data.id,
-        number: data.number,
-        title: data.title,
-        body: data.body ?? null,
-        state: data.state,
-        url: data.html_url,
-        author: data.user?.login ?? null,
-        createdAt: data.created_at,
-      };
+      return mapToIssue(data);
     } catch (error) {
       throw mapGitHubError(error, `El repositorio "${owner}/${repo}"`);
     }
@@ -86,16 +112,7 @@ export async function listRepositories(
         per_page: limit,
         sort: "updated",
       });
-      return data.map((repo) => ({
-        id: repo.id,
-        name: repo.name,
-        fullName: repo.full_name,
-        description: repo.description ?? null,
-        url: repo.html_url,
-        isPrivate: repo.private,
-        defaultBranch: repo.default_branch,
-        createdAt: repo.created_at ?? null,
-      }));
+      return data.map(mapToRepository);
     } catch (error) {
       throw mapGitHubError(error);
     }
@@ -122,19 +139,16 @@ export async function createCommit(
       });
       const latestSha = refData.object.sha;
 
-      const { data: commitData } = await octokit.git.getCommit({
-        owner,
-        repo,
-        commit_sha: latestSha,
-      });
+      const [{ data: commitData }, { data: blobData }] = await Promise.all([
+        octokit.git.getCommit({ owner, repo, commit_sha: latestSha }),
+        octokit.git.createBlob({
+          owner,
+          repo,
+          content: Buffer.from(content).toString("base64"),
+          encoding: "base64",
+        }),
+      ]);
       const treeSha = commitData.tree.sha;
-
-      const { data: blobData } = await octokit.git.createBlob({
-        owner,
-        repo,
-        content: Buffer.from(content).toString("base64"),
-        encoding: "base64",
-      });
 
       const { data: newTree } = await octokit.git.createTree({
         owner,
@@ -195,16 +209,7 @@ export async function listIssues(
       });
       return data
         .filter((issue) => !issue.pull_request)
-        .map((issue) => ({
-          id: issue.id,
-          number: issue.number,
-          title: issue.title,
-          body: issue.body ?? null,
-          state: issue.state,
-          url: issue.html_url,
-          author: issue.user?.login ?? null,
-          createdAt: issue.created_at,
-        }));
+        .map(mapToIssue);
     } catch (error) {
       throw mapGitHubError(error, `El repositorio "${owner}/${repo}"`);
     }
@@ -273,16 +278,7 @@ export async function closeIssue(
         issue_number: issueNumber,
         state: "closed",
       });
-      return {
-        id: data.id,
-        number: data.number,
-        title: data.title,
-        body: data.body ?? null,
-        state: data.state,
-        url: data.html_url,
-        author: data.user?.login ?? null,
-        createdAt: data.created_at,
-      };
+      return mapToIssue(data);
     } catch (error) {
       throw mapGitHubError(error, `El issue #${issueNumber} en "${owner}/${repo}"`);
     }
@@ -427,16 +423,7 @@ export async function assignIssue(
         issue_number: issueNumber,
         assignees,
       });
-      return {
-        id: data.id,
-        number: data.number,
-        title: data.title,
-        body: data.body ?? null,
-        state: data.state,
-        url: data.html_url,
-        author: data.user?.login ?? null,
-        createdAt: data.created_at,
-      };
+      return mapToIssue(data);
     } catch (error) {
       throw mapGitHubError(error, `El issue #${issueNumber} en "${owner}/${repo}"`);
     }

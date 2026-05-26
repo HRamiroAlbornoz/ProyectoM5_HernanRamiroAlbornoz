@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createBranchSchema } from "../schemas/index.js";
 import { createBranch } from "../github/operations.js";
-import { AppError } from "../errors/index.js";
+import { toToolError } from "../errors/index.js";
 import type { ToolResult } from "../types.js";
 
 export function registerCreateBranch(server: McpServer): void {
@@ -30,13 +30,7 @@ export function registerCreateBranch(server: McpServer): void {
           ],
         };
       } catch (error) {
-        const appError = error instanceof AppError ? error : new AppError(
-          "Error inesperado al crear la rama.",
-          "UNKNOWN_ERROR",
-          false,
-          "ESCALATE",
-          undefined
-        );
+        const appError = toToolError(error, "crear la rama");
         return {
           content: [{ type: "text", text: appError.message }],
           isError: true,

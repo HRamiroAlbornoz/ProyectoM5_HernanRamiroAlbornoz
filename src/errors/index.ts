@@ -74,6 +74,18 @@ export class NetworkError extends AppError {
   }
 }
 
+export function toToolError(error: unknown, operation: string): AppError {
+  return error instanceof AppError
+    ? error
+    : new AppError(
+        `Error inesperado al ${operation}.`,
+        "UNKNOWN_ERROR",
+        false,
+        "ESCALATE",
+        undefined
+      );
+}
+
 export function mapGitHubError(error: unknown, resourceName?: string): AppError {
   if (error instanceof AppError) return error;
 

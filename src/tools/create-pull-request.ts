@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createPullRequestSchema } from "../schemas/index.js";
 import { createPullRequest } from "../github/operations.js";
-import { AppError } from "../errors/index.js";
+import { toToolError } from "../errors/index.js";
 import type { ToolResult } from "../types.js";
 
 export function registerCreatePullRequest(server: McpServer): void {
@@ -32,13 +32,7 @@ export function registerCreatePullRequest(server: McpServer): void {
           ],
         };
       } catch (error) {
-        const appError = error instanceof AppError ? error : new AppError(
-          "Error inesperado al crear el pull request.",
-          "UNKNOWN_ERROR",
-          false,
-          "ESCALATE",
-          undefined
-        );
+        const appError = toToolError(error, "crear el pull request");
         return {
           content: [{ type: "text", text: appError.message }],
           isError: true,

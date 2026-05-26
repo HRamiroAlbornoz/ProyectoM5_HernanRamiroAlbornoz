@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createIssueSchema } from "../schemas/index.js";
 import { createIssue } from "../github/operations.js";
-import { AppError } from "../errors/index.js";
+import { toToolError } from "../errors/index.js";
 import type { ToolResult } from "../types.js";
 
 export function registerCreateIssue(server: McpServer): void {
@@ -30,13 +30,7 @@ export function registerCreateIssue(server: McpServer): void {
           ],
         };
       } catch (error) {
-        const appError = error instanceof AppError ? error : new AppError(
-          "Error inesperado al crear el issue.",
-          "UNKNOWN_ERROR",
-          false,
-          "ESCALATE",
-          undefined
-        );
+        const appError = toToolError(error, "crear el issue");
         return {
           content: [{ type: "text", text: appError.message }],
           isError: true,

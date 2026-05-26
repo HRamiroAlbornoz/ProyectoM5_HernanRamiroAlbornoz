@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { closeIssueSchema } from "../schemas/index.js";
 import { closeIssue } from "../github/operations.js";
-import { AppError } from "../errors/index.js";
+import { toToolError } from "../errors/index.js";
 import type { ToolResult } from "../types.js";
 
 export function registerCloseIssue(server: McpServer): void {
@@ -25,13 +25,7 @@ export function registerCloseIssue(server: McpServer): void {
           ],
         };
       } catch (error) {
-        const appError = error instanceof AppError ? error : new AppError(
-          "Error inesperado al cerrar el issue.",
-          "UNKNOWN_ERROR",
-          false,
-          "ESCALATE",
-          undefined
-        );
+        const appError = toToolError(error, "cerrar el issue");
         return {
           content: [{ type: "text", text: appError.message }],
           isError: true,

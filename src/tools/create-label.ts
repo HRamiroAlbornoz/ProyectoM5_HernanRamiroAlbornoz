@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createLabelSchema } from "../schemas/index.js";
 import { createLabel } from "../github/operations.js";
-import { AppError } from "../errors/index.js";
+import { toToolError } from "../errors/index.js";
 import type { ToolResult } from "../types.js";
 
 export function registerCreateLabel(server: McpServer): void {
@@ -31,13 +31,7 @@ export function registerCreateLabel(server: McpServer): void {
           ],
         };
       } catch (error) {
-        const appError = error instanceof AppError ? error : new AppError(
-          "Error inesperado al crear el label.",
-          "UNKNOWN_ERROR",
-          false,
-          "ESCALATE",
-          undefined
-        );
+        const appError = toToolError(error, "crear el label");
         return {
           content: [{ type: "text", text: appError.message }],
           isError: true,

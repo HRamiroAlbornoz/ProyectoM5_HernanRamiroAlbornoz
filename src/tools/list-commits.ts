@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { listCommitsSchema } from "../schemas/index.js";
 import { listCommits } from "../github/operations.js";
-import { AppError } from "../errors/index.js";
+import { toToolError } from "../errors/index.js";
 import type { ToolResult } from "../types.js";
 
 export function registerListCommits(server: McpServer): void {
@@ -49,13 +49,7 @@ export function registerListCommits(server: McpServer): void {
           ],
         };
       } catch (error) {
-        const appError = error instanceof AppError ? error : new AppError(
-          "Error inesperado al listar los commits.",
-          "UNKNOWN_ERROR",
-          false,
-          "ESCALATE",
-          undefined
-        );
+        const appError = toToolError(error, "listar los commits");
         return {
           content: [{ type: "text", text: appError.message }],
           isError: true,

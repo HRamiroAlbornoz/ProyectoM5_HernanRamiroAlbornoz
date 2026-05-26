@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { createRepositorySchema } from "../schemas/index.js";
 import { createRepository } from "../github/operations.js";
-import { AppError } from "../errors/index.js";
+import { toToolError } from "../errors/index.js";
 import type { ToolResult } from "../types.js";
 
 export function registerCreateRepository(server: McpServer): void {
@@ -29,13 +29,7 @@ export function registerCreateRepository(server: McpServer): void {
           ],
         };
       } catch (error) {
-        const appError = error instanceof AppError ? error : new AppError(
-          "Error inesperado al crear el repositorio.",
-          "UNKNOWN_ERROR",
-          false,
-          "ESCALATE",
-          undefined
-        );
+        const appError = toToolError(error, "crear el repositorio");
         return {
           content: [{ type: "text", text: appError.message }],
           isError: true,

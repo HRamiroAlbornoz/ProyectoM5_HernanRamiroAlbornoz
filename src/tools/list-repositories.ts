@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { listRepositoriesSchema } from "../schemas/index.js";
 import { listRepositories } from "../github/operations.js";
-import { AppError } from "../errors/index.js";
+import { toToolError } from "../errors/index.js";
 import type { ToolResult } from "../types.js";
 
 export function registerListRepositories(server: McpServer): void {
@@ -39,13 +39,7 @@ export function registerListRepositories(server: McpServer): void {
           ],
         };
       } catch (error) {
-        const appError = error instanceof AppError ? error : new AppError(
-          "Error inesperado al listar los repositorios.",
-          "UNKNOWN_ERROR",
-          false,
-          "ESCALATE",
-          undefined
-        );
+        const appError = toToolError(error, "listar los repositorios");
         return {
           content: [{ type: "text", text: appError.message }],
           isError: true,
