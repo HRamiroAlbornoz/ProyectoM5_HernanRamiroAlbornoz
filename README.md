@@ -156,7 +156,7 @@ GITHUB_TOKEN=ghp_tu_token_real_aqui
 
 - **Nunca commitees el archivo `.env`.** Está incluido en `.gitignore` por defecto.
 - **Nunca compartas el `GITHUB_TOKEN`.** Equivale a tu contraseña de GitHub para todas las operaciones que el token autoriza.
-- Si sospechás que el token se filtró, **revocalo inmediatamente** en [github.com/settings/tokens](https://github.com/settings/tokens) y generá uno nuevo.
+- Si se sospecha que el token se filtró, **revocarlo inmediatamente** en [github.com/settings/tokens](https://github.com/settings/tokens) y generar uno nuevo.
 - El servidor sanitiza automáticamente las claves `token`, `password`, `secret`, `apiKey` y `authorization` en los logs, pero eso no reemplaza el cuidado al manejar el `.env`.
 - **En producción**, nunca uses un `.env` físico: cargá las variables desde el dashboard del proveedor (Railway, Vercel, etc.) o desde un secret manager.
 
@@ -198,7 +198,7 @@ Para verificar que el servidor funciona correctamente, usar MCP Inspector:
 npx @modelcontextprotocol/inspector node dist/server.js
 ```
 
-Deberías ver los 13 tools listados en la interfaz del inspector.
+Se deberían ver los 13 tools listados en la interfaz del inspector.
 
 ## Documentación de tools
 
