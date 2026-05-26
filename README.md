@@ -21,6 +21,29 @@ Los equipos de desarrollo repiten las mismas operaciones en GitHub decenas de ve
 
 El agente de IA interpreta el pedido, elige la herramienta correcta y ejecuta la acción automáticamente.
 
+## Quickstart
+
+Los 4 pasos mínimos para tener el servidor corriendo localmente:
+
+```bash
+# 1. Clonar e instalar
+git clone https://github.com/HRamiroAlbornoz/ProyectoM5_HernanRamiroAlbornoz.git
+cd ProyectoM5_HernanRamiroAlbornoz
+npm install
+
+# 2. Configurar el token
+cp .env.example .env
+# Editar .env y reemplazar el placeholder por un GitHub Personal Access Token con scopes: repo, user, admin:org
+
+# 3. Compilar
+npm run build
+
+# 4. Verificar que arranca correctamente
+npx @modelcontextprotocol/inspector node dist/server.js
+```
+
+Si la verificación muestra los 13 tools en MCP Inspector, el servidor está listo para conectarse a Antigravity (ver sección [Configuración](#configuración)).
+
 ## Arquitectura del sistema
 
 ```
@@ -122,6 +145,21 @@ Abrir `.env` y reemplazar el valor con el token real:
 GITHUB_TOKEN=ghp_tu_token_real_aqui
 ```
 
+#### Variables de entorno disponibles
+
+| Variable | Tipo | Requerida | Valor por defecto | Descripción |
+|---|---|---|---|---|
+| `GITHUB_TOKEN` | string | ✅ Sí | — | Personal Access Token de GitHub con scopes `repo`, `user`, `admin:org`. Sin esta variable el servidor no arranca. |
+| `LOG_LEVEL` | string | ❌ No | `info` | Nivel mínimo de logs a stderr. Valores válidos: `debug`, `info`, `warn`, `error`. Un valor inválido se ignora y se usa `info`. |
+
+#### Advertencias sobre secretos
+
+- **Nunca commitees el archivo `.env`.** Está incluido en `.gitignore` por defecto.
+- **Nunca compartas el `GITHUB_TOKEN`.** Equivale a tu contraseña de GitHub para todas las operaciones que el token autoriza.
+- Si sospechás que el token se filtró, **revocalo inmediatamente** en [github.com/settings/tokens](https://github.com/settings/tokens) y generá uno nuevo.
+- El servidor sanitiza automáticamente las claves `token`, `password`, `secret`, `apiKey` y `authorization` en los logs, pero eso no reemplaza el cuidado al manejar el `.env`.
+- **En producción**, nunca uses un `.env` físico: cargá las variables desde el dashboard del proveedor (Railway, Vercel, etc.) o desde un secret manager.
+
 ### Paso 3 — Configurar el MCP server en Antigravity
 
 Abrir la configuración de MCP servers en Antigravity y agregar la siguiente entrada:
@@ -176,6 +214,20 @@ Crea un nuevo repositorio en la cuenta del usuario autenticado.
 **Ejemplo de prompt:**
 > *"Creá un repositorio llamado mi-proyecto con descripción 'Proyecto de práctica' y que sea privado"*
 
+**Output esperado:**
+```json
+{
+  "id": 123456789,
+  "name": "mi-proyecto",
+  "fullName": "HRamiroAlbornoz/mi-proyecto",
+  "description": "Proyecto de práctica",
+  "url": "https://github.com/HRamiroAlbornoz/mi-proyecto",
+  "isPrivate": true,
+  "defaultBranch": "main",
+  "createdAt": "2026-05-26T12:34:56Z"
+}
+```
+
 ---
 
 ### `create_issue`
@@ -191,6 +243,20 @@ Abre un nuevo issue en un repositorio.
 **Ejemplo de prompt:**
 > *"Abrí un issue en HRamiroAlbornoz/mi-repo con el título 'Bug: el login falla en móvil' y descripción 'El formulario no envía en Safari'"*
 
+**Output esperado:**
+```json
+{
+  "id": 987654321,
+  "number": 6,
+  "title": "Bug: el login falla en móvil",
+  "body": "El formulario no envía en Safari",
+  "state": "open",
+  "url": "https://github.com/HRamiroAlbornoz/mi-repo/issues/6",
+  "author": "HRamiroAlbornoz",
+  "createdAt": "2026-05-26T12:34:56Z"
+}
+```
+
 ---
 
 ### `list_repositories`
@@ -202,6 +268,22 @@ Lista los repositorios del usuario autenticado ordenados por fecha de actualizac
 
 **Ejemplo de prompt:**
 > *"Mostrá mis últimos 10 repositorios de GitHub"*
+
+**Output esperado:** Array de objetos `GitHubRepository` (mismo shape que `create_repository`).
+```json
+[
+  {
+    "id": 123,
+    "name": "repo-uno",
+    "fullName": "HRamiroAlbornoz/repo-uno",
+    "description": "Primer repositorio",
+    "url": "https://github.com/HRamiroAlbornoz/repo-uno",
+    "isPrivate": false,
+    "defaultBranch": "main",
+    "createdAt": "2026-05-26T12:34:56Z"
+  }
+]
+```
 
 ---
 
@@ -220,6 +302,16 @@ Crea un commit agregando o modificando un archivo en un repositorio.
 **Ejemplo de prompt:**
 > *"Hacé un commit en HRamiroAlbornoz/mi-repo en la rama main, creando el archivo README.md con el contenido '# Mi Proyecto', con el mensaje 'Add README'"*
 
+**Output esperado:**
+```json
+{
+  "sha": "abc123def456ghi789",
+  "message": "Add README",
+  "url": "https://github.com/HRamiroAlbornoz/mi-repo/commit/abc123def456ghi789",
+  "author": "Hernán Albornoz"
+}
+```
+
 ---
 
 ### `list_issues`
@@ -234,6 +326,22 @@ Lista los issues de un repositorio.
 
 **Ejemplo de prompt:**
 > *"Listá los issues cerrados de HRamiroAlbornoz/mi-repo"*
+
+**Output esperado:** Array de objetos `GitHubIssue` (mismo shape que `create_issue`). Los pull requests se filtran automáticamente.
+```json
+[
+  {
+    "id": 1,
+    "number": 1,
+    "title": "Bug: el login falla en móvil",
+    "body": null,
+    "state": "closed",
+    "url": "https://github.com/HRamiroAlbornoz/mi-repo/issues/1",
+    "author": "HRamiroAlbornoz",
+    "createdAt": "2026-05-26T12:34:56Z"
+  }
+]
+```
 
 ---
 
@@ -250,6 +358,14 @@ Crea una nueva rama en un repositorio.
 **Ejemplo de prompt:**
 > *"Creá la rama feature/login en HRamiroAlbornoz/mi-repo a partir de main"*
 
+**Output esperado:**
+```json
+{
+  "name": "feature/login",
+  "sha": "80bf119abc123def"
+}
+```
+
 ---
 
 ### `close_issue`
@@ -263,6 +379,20 @@ Cierra un issue existente.
 
 **Ejemplo de prompt:**
 > *"Cerrá el issue #5 de HRamiroAlbornoz/mi-repo"*
+
+**Output esperado:** Objeto `GitHubIssue` con `state: "closed"`.
+```json
+{
+  "id": 1,
+  "number": 5,
+  "title": "Bug resuelto",
+  "body": null,
+  "state": "closed",
+  "url": "https://github.com/HRamiroAlbornoz/mi-repo/issues/5",
+  "author": "HRamiroAlbornoz",
+  "createdAt": "2026-05-26T12:34:56Z"
+}
+```
 
 ---
 
@@ -279,6 +409,17 @@ Agrega un comentario a un issue existente.
 **Ejemplo de prompt:**
 > *"Comentá en el issue #3 de HRamiroAlbornoz/mi-repo: 'Esto está resuelto en la rama hotfix/login'"*
 
+**Output esperado:**
+```json
+{
+  "id": 50,
+  "body": "Esto está resuelto en la rama hotfix/login",
+  "url": "https://github.com/HRamiroAlbornoz/mi-repo/issues/3#issuecomment-50",
+  "author": "HRamiroAlbornoz",
+  "createdAt": "2026-05-26T12:34:56Z"
+}
+```
+
 ---
 
 ### `list_commits`
@@ -293,6 +434,18 @@ Lista los commits recientes de un repositorio.
 
 **Ejemplo de prompt:**
 > *"Mostrá los últimos 5 commits de la rama develop en HRamiroAlbornoz/mi-repo"*
+
+**Output esperado:** Array de objetos `GitHubCommit`.
+```json
+[
+  {
+    "sha": "abc123def456ghi789",
+    "message": "feat: primera funcionalidad",
+    "url": "https://github.com/HRamiroAlbornoz/mi-repo/commit/abc123def456ghi789",
+    "author": "Hernán Albornoz"
+  }
+]
+```
 
 ---
 
@@ -311,6 +464,19 @@ Crea un pull request entre dos ramas.
 **Ejemplo de prompt:**
 > *"Creá un pull request en HRamiroAlbornoz/mi-repo para fusionar feature/login en main con el título 'feat: implementar login'"*
 
+**Output esperado:**
+```json
+{
+  "id": 200,
+  "number": 7,
+  "title": "feat: implementar login",
+  "url": "https://github.com/HRamiroAlbornoz/mi-repo/pull/7",
+  "state": "open",
+  "sourceBranch": "feature/login",
+  "targetBranch": "main"
+}
+```
+
 ---
 
 ### `create_label`
@@ -327,6 +493,16 @@ Crea un label personalizado en un repositorio.
 **Ejemplo de prompt:**
 > *"Creá un label llamado 'urgente' de color rojo (ff0000) en HRamiroAlbornoz/mi-repo"*
 
+**Output esperado:**
+```json
+{
+  "id": 300,
+  "name": "urgente",
+  "color": "ff0000",
+  "description": null
+}
+```
+
 ---
 
 ### `assign_issue`
@@ -342,6 +518,20 @@ Asigna uno o más usuarios a un issue.
 **Ejemplo de prompt:**
 > *"Asigná el issue #2 de HRamiroAlbornoz/mi-repo al usuario HRamiroAlbornoz"*
 
+**Output esperado:** Objeto `GitHubIssue` actualizado con los assignees aplicados (los assignees no aparecen en el DTO, pero la operación los aplica en GitHub).
+```json
+{
+  "id": 1,
+  "number": 2,
+  "title": "Issue a asignar",
+  "body": null,
+  "state": "open",
+  "url": "https://github.com/HRamiroAlbornoz/mi-repo/issues/2",
+  "author": "HRamiroAlbornoz",
+  "createdAt": "2026-05-26T12:34:56Z"
+}
+```
+
 ---
 
 ### `add_collaborator`
@@ -356,6 +546,17 @@ Agrega un colaborador a un repositorio con permisos específicos.
 
 **Ejemplo de prompt:**
 > *"Agregá al usuario octocat como colaborador con permisos de escritura en HRamiroAlbornoz/mi-repo"*
+
+**Output esperado:** Mensaje de confirmación en texto. Esta tool no retorna un DTO porque GitHub envía una invitación al usuario que debe aceptar antes de tener acceso.
+```
+Colaborador agregado exitosamente.
+
+Usuario: octocat
+Repositorio: HRamiroAlbornoz/mi-repo
+Permisos: push
+
+Nota: Se envió una invitación al usuario. Deberá aceptarla para acceder al repositorio.
+```
 
 ---
 
@@ -399,10 +600,12 @@ Para ver el reporte de cobertura:
 npx vitest run --coverage
 ```
 
-Los tests cubren tres áreas:
+Los tests cubren cinco áreas (100 tests en total):
 - **`tests/errors.test.ts`** — transformación de errores de GitHub a mensajes en lenguaje natural
 - **`tests/tools.test.ts`** — validación de schemas Zod (inputs válidos e inválidos)
-- **`tests/github.test.ts`** — operaciones de GitHub con Octokit completamente mockeado
+- **`tests/github.test.ts`** — operaciones de GitHub con Octokit completamente mockeado (cubre las 13 tools)
+- **`tests/retry.test.ts`** — backoff exponencial, decisión de reintentar y agotamiento de intentos
+- **`tests/logging.test.ts`** — sanitización de datos sensibles y generación de `requestId`
 
 ## Scripts disponibles
 
@@ -416,31 +619,76 @@ Los tests cubren tres áreas:
 
 ## Troubleshooting
 
-### El servidor no arranca y dice "No se encontró el token de GitHub"
-Verificar que el archivo `.env` existe en la raíz del proyecto y que `GITHUB_TOKEN` tiene un valor real (no el placeholder del `.env.example`).
+### Taxonomía de errores
 
-### Error 401 — Token inválido o expirado
-El token de GitHub expiró o fue revocado. Generar uno nuevo en [github.com/settings/tokens](https://github.com/settings/tokens) con los scopes `repo`, `user` y `admin:org`.
+Cada error que el servidor devuelve incluye un `code`, un campo `retryable` (si tiene sentido reintentar) y una `action` sugerida (`FIX_INPUT`, `REQUEST_CREDENTIALS`, `WAIT_AND_RETRY`, `ESCALATE`). La tabla siguiente vincula cada código con la causa probable y la acción concreta a tomar.
 
-### Error 403 — Sin permisos
-El token no tiene los scopes necesarios. Verificar que tiene `repo`, `user` y `admin:org` activados.
+| Código de error | Status HTTP | `retryable` | `action` | Causa probable | Acción recomendada |
+|---|---|---|---|---|---|
+| `VALIDATION_ERROR` | — | `false` | `FIX_INPUT` | El input falló la validación de Zod (longitud, formato, campo requerido faltante) | Revisar la documentación de la tool y corregir el input según el mensaje de error específico |
+| `AUTHENTICATION_ERROR` | 401 | `false` | `REQUEST_CREDENTIALS` | Token de GitHub inválido, expirado o revocado | Generar un nuevo token en [github.com/settings/tokens](https://github.com/settings/tokens) con scopes `repo`, `user`, `admin:org` y actualizar `.env` |
+| `GITHUB_API_ERROR` | 403 (rate limit) | `true` | `WAIT_AND_RETRY` | Se superó el límite de peticiones a la API de GitHub | Esperar 1-2 minutos y reintentar. El retry automático del servidor ya lo hace hasta 3 veces con backoff exponencial (1s, 2s, 4s) |
+| `GITHUB_API_ERROR` | 403 (permisos) | `false` | `REQUEST_CREDENTIALS` | El token no tiene los scopes necesarios | Revocar el token y generar uno nuevo con los scopes correctos (`repo`, `user`, `admin:org`) |
+| `GITHUB_API_ERROR` | 404 | `false` | `FIX_INPUT` | Repositorio, issue, rama o recurso inexistente | Verificar que `owner` y `repo` estén escritos exactamente igual que en GitHub (respetan mayúsculas y minúsculas). Para issues, verificar que el `issueNumber` exista |
+| `GITHUB_API_ERROR` | 422 | `false` | `FIX_INPUT` | Datos inválidos para GitHub (ej: nombre de label duplicado, rama ya existente, PR sin diferencias entre `head` y `base`) | Revisar los parámetros enviados y la documentación de la tool |
+| `GITHUB_API_ERROR` | 429 | `true` | `WAIT_AND_RETRY` | Demasiadas peticiones en un período corto | El retry automático lo gestiona. Si persiste, esperar unos minutos antes de reintentar manualmente |
+| `GITHUB_API_ERROR` | 5xx | `true` | `WAIT_AND_RETRY` | Error interno en los servidores de GitHub | El retry automático lo gestiona. Si persiste, revisar [www.githubstatus.com](https://www.githubstatus.com) |
+| `NETWORK_ERROR` | — | `true` | `WAIT_AND_RETRY` | Problemas de conectividad (`ENOTFOUND`, sin DNS, sin red) | Verificar la conexión a internet. Si persiste, revisar firewall y proxy |
+| `UNKNOWN_ERROR` | — | `false` | `ESCALATE` | Error inesperado no clasificado | Revisar los logs en `stderr` con el `requestId` del error para obtener el stack trace completo. Reportar como issue en el repositorio si es reproducible |
 
-### Error 404 — Repositorio no encontrado
-Verificar que el `owner` y el `repo` estén escritos exactamente igual que en GitHub (respetan mayúsculas y minúsculas).
+### Problemas comunes en la instalación y configuración
 
-### Antigravity no detecta el servidor
-- Verificar que se ejecutó `npm run build` antes de configurar Antigravity
-- Verificar que la ruta en la configuración de Antigravity apunta al archivo `dist/server.js` compilado
-- Verificar que el `GITHUB_TOKEN` está configurado en la sección `env` de la configuración de Antigravity
+| Problema | Causa probable | Acción recomendada |
+|---|---|---|
+| El servidor no arranca y dice *"No se encontró el token de GitHub"* | Falta el archivo `.env` o `GITHUB_TOKEN` tiene el placeholder del `.env.example` | Verificar que `.env` existe en la raíz y contiene un token real |
+| Antigravity no detecta el servidor | Falta compilar, ruta incorrecta o `GITHUB_TOKEN` no configurado | Ejecutar `npm run build`, verificar la ruta absoluta a `dist/server.js`, y confirmar que el `GITHUB_TOKEN` está en `env` |
+| Los tools no aparecen en Antigravity | El servidor falla al arrancar | Correr `npx @modelcontextprotocol/inspector node dist/server.js` para verificar el servidor independientemente |
+| Los tools fallan silenciosamente | No se ven los logs de error | Los logs van a `stderr` en formato JSON. En Antigravity revisar la consola de desarrollo. Buscar la entrada con `level: "error"` y el `requestId` correspondiente |
 
-### Los tools no aparecen en Antigravity
-Usar MCP Inspector para verificar que el servidor arranca correctamente y lista los 13 tools:
-```bash
-npx @modelcontextprotocol/inspector node dist/server.js
-```
+### Debugging avanzado
 
-### El servidor arranca pero los tools fallan silenciosamente
-Revisar los logs del servidor. Los logs se escriben a `stderr` en formato JSON. En Antigravity se pueden ver los logs del servidor en la consola de desarrollo.
+- **Activar logs detallados:** setear `LOG_LEVEL=debug` en `.env` para ver más información en cada operación.
+- **Correlacionar logs:** cada operación genera un `requestId` único (ej: `op_a1b2c3d4`). Filtrar los logs por ese ID para ver toda la cadena de eventos de esa operación.
+- **Aislar el servidor:** usar MCP Inspector para llamar a las tools manualmente y descartar problemas del lado de Antigravity o del LLM.
+
+## Release checklist
+
+Antes de publicar el servidor o entregarlo a revisión externa, verificar cada punto:
+
+### Calidad del código
+- [ ] `npm run lint` pasa sin errores (`tsc --noEmit`)
+- [ ] `npm run build` compila sin warnings ni errores
+- [ ] `npm run test` muestra **100 tests pasando** en 5 archivos (`errors.test.ts`, `tools.test.ts`, `github.test.ts`, `retry.test.ts`, `logging.test.ts`)
+- [ ] `npx vitest run --coverage` ejecutado para revisar la cobertura
+- [ ] No hay `console.log` en `src/` (todo el logging va por `logger` a stderr)
+- [ ] No hay `any` en el código (verificar con grep o IDE)
+
+### Seguridad
+- [ ] El archivo `.env` está en `.gitignore` y nunca fue commiteado
+- [ ] El `.env.example` existe en el repositorio y no contiene valores reales
+- [ ] No hay tokens, claves o secretos hardcodeados en el código
+- [ ] Las claves sensibles (`token`, `password`, `secret`, `apiKey`, `authorization`) se sanitizan automáticamente en los logs
+
+### Funcionamiento end-to-end
+- [ ] Las 13 tools aparecen en MCP Inspector (`npx @modelcontextprotocol/inspector node dist/server.js`)
+- [ ] Smoke test en Antigravity: al menos 3 tools probadas con prompts en lenguaje natural
+  - [ ] `list_repositories` retorna repositorios reales
+  - [ ] `create_issue` crea un issue real en un repo de prueba
+  - [ ] `list_issues` lista los issues del repo
+- [ ] Los logs en stderr muestran `requestId`, `durationMs` y `status` por cada operación
+
+### Documentación
+- [ ] El `README.md` está actualizado con la estructura actual del proyecto
+- [ ] Cada una de las 13 tools tiene documentación con inputs, output esperado y prompt de ejemplo
+- [ ] La sección de Troubleshooting cubre los errores comunes con sus códigos
+- [ ] Las decisiones arquitectónicas están documentadas
+- [ ] Las limitaciones conocidas están listadas
+
+### Git
+- [ ] No hay archivos pendientes de commit (`git status` limpio)
+- [ ] La rama `main` está sincronizada con el remoto (`git push` ejecutado)
+- [ ] Los commits siguen el formato convencional (`feat:`, `refactor:`, `docs:`, etc.)
+- [ ] No hay archivos generados o sensibles commiteados (`dist/`, `coverage/`, `node_modules/`, `.env`)
 
 ## Stack tecnológico
 
@@ -458,30 +706,49 @@ Revisar los logs del servidor. Los logs se escriben a `stderr` en formato JSON. 
 ```
 ProyectoM5_HernanRamiroAlbornoz/
 ├── src/
-│   ├── errors/        → Jerarquía de errores tipados y función mapGitHubError
-│   ├── github/        → Cliente Octokit (singleton) y operaciones de la API
-│   ├── schemas/       → Schemas Zod de validación para las 13 tools
-│   ├── tools/         → Registro de cada tool en el servidor MCP (13 archivos)
-│   ├── utils/         → Logger estructurado (stderr) y retry con backoff exponencial
-│   ├── types.ts       → DTOs de respuesta y tipo ToolResult
-│   └── server.ts      → Bootstrap del servidor MCP
+│   ├── errors/                  → Jerarquía de errores tipados y función mapGitHubError
+│   ├── github/
+│   │   ├── client.ts            → Cliente Octokit (singleton)
+│   │   ├── mappers.ts           → DTOs y helpers de contexto de error
+│   │   └── operations/          → Operaciones de la API agrupadas por dominio
+│   │       ├── index.ts         → Barrel file que re-exporta todas las operaciones
+│   │       ├── repositories.ts  → createRepository, listRepositories
+│   │       ├── issues.ts        → createIssue, listIssues, closeIssue, addCommentToIssue, assignIssue
+│   │       ├── branches.ts      → createBranch
+│   │       ├── commits.ts       → createCommit, listCommits
+│   │       ├── pull-requests.ts → createPullRequest
+│   │       ├── labels.ts        → createLabel
+│   │       └── collaborators.ts → addCollaborator
+│   ├── schemas/                 → Schemas Zod de validación para las 13 tools
+│   ├── tools/                   → Registro de cada tool en el servidor MCP (13 archivos)
+│   ├── utils/                   → Logger estructurado (stderr) y retry con backoff exponencial
+│   ├── types.ts                 → DTOs de respuesta y tipo ToolResult
+│   └── server.ts                → Bootstrap del servidor MCP
 ├── tests/
-│   ├── errors.test.ts → Tests de mapGitHubError y clases de error
-│   ├── tools.test.ts  → Tests de validación de schemas Zod
-│   └── github.test.ts → Tests de operaciones con Octokit mockeado
-├── .env.example       → Template de variables de entorno
-├── tsconfig.json      → Configuración TypeScript (NodeNext, strict, ESM)
-├── vitest.config.ts   → Configuración de tests y cobertura
-└── package.json       → Scripts y dependencias
+│   ├── errors.test.ts           → Tests de mapGitHubError y clases de error
+│   ├── tools.test.ts            → Tests de validación de schemas Zod
+│   ├── github.test.ts           → Tests de operaciones con Octokit mockeado
+│   ├── retry.test.ts            → Tests del backoff exponencial y reintentos
+│   └── logging.test.ts          → Tests de sanitización y requestId
+├── .env.example                 → Template de variables de entorno
+├── tsconfig.json                → Configuración TypeScript (NodeNext, strict, ESM)
+├── vitest.config.ts             → Configuración de tests y cobertura
+└── package.json                 → Scripts y dependencias
 ```
 
 ## Decisiones arquitectónicas
 
-**Separación cliente / operaciones:** `src/github/client.ts` contiene únicamente el singleton de Octokit y `src/github/operations.ts` contiene la lógica de cada operación. Esta separación es intencional: permite que los tests reemplacen el cliente con un mock sin modificar las operaciones, respetando el principio de responsabilidad única.
+**Separación cliente / operaciones / mappers:** `src/github/client.ts` contiene únicamente el singleton de Octokit, `src/github/mappers.ts` agrupa las funciones puras que transforman respuestas de Octokit en DTOs propios, y `src/github/operations/` contiene las operaciones agrupadas por dominio (repositories, issues, branches, commits, pull-requests, labels, collaborators). Esta separación cumple tres propósitos: permite que los tests reemplacen el cliente con un mock sin tocar las operaciones, mantiene cada archivo bajo ~130 líneas, y aísla las funciones de mapeo para reutilizarlas entre dominios.
 
-**Schemas como contrato:** Los schemas Zod en `src/schemas/index.ts` cumplen dos roles al mismo tiempo. En runtime validan el input que llega del LLM antes de tocar la API. En tiempo de compilación, los tipos se derivan con `z.infer` para que nunca queden desfasados con la validación. Un solo cambio en el schema propaga a toda la cadena.
+**Mappers como contrato de salida:** Cada respuesta de la API de GitHub pasa por un mapper (`mapToRepository`, `mapToIssue`, `mapToCommit`, `mapToComment`) antes de retornarse. Esto desacopla el shape de Octokit (50+ campos) del shape que ve el LLM (5-8 campos por DTO), y asegura que el agente reciba siempre la misma estructura sin importar qué cambie GitHub en su API.
+
+**Schemas como contrato de entrada:** Los schemas Zod en `src/schemas/index.ts` cumplen dos roles al mismo tiempo. En runtime validan el input que llega del LLM antes de tocar la API. En tiempo de compilación, los tipos se derivan con `z.infer` para que nunca queden desfasados con la validación. Un solo cambio en el schema propaga a toda la cadena.
 
 **Logging exclusivo a stderr:** El protocolo MCP usa `stdout` para comunicación JSON-RPC con el host. Cualquier byte extra en `stdout` —incluso un `console.log`— corrompe el canal. Por eso todos los logs van a `process.stderr.write()` en formato JSON estructurado con timestamp, nivel y datos de contexto.
+
+**Logs con `requestId`, duración y status:** Cada operación se envuelve con `withOperationLogging()`, que genera un `requestId` único, mide la duración y loguea inicio + éxito/error con un `errorCode` cuando aplica. El `requestId` permite correlacionar todos los logs de una misma operación incluso cuando hay llamadas concurrentes.
+
+**Sanitización automática de datos sensibles:** El logger redacta automáticamente los valores de claves sensibles (`token`, `password`, `secret`, `apiKey`, `authorization`) antes de escribir a stderr. Esto evita que un error de programación filtre credenciales en los logs.
 
 **Retry con backoff exponencial:** Los errores marcados como `retryable: true` (errores de red, 429, 5xx) se reintentan automáticamente hasta 3 veces con demoras de 1s, 2s y 4s. Los errores definitivos (401, 403, 404, 422) no se reintentan jamás, evitando desperdiciar rate limit.
 
