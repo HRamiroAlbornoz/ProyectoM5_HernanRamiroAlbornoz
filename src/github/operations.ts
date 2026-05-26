@@ -1,7 +1,7 @@
 import { getOctokitClient } from "./client.js";
 import { mapGitHubError } from "../errors/index.js";
 import { withRetry } from "../utils/retry.js";
-import { logger } from "../utils/logging.js";
+import { withOperationLogging } from "../utils/logging.js";
 import type {
   GitHubRepository,
   GitHubIssue,
@@ -34,6 +34,10 @@ function mapToRepository(data: {
   };
 }
 
+function normalizeIssueState(state: string): "open" | "closed" {
+  return state === "closed" ? "closed" : "open";
+}
+
 function mapToIssue(data: {
   id: number;
   number: number;
@@ -49,7 +53,7 @@ function mapToIssue(data: {
     number: data.number,
     title: data.title,
     body: data.body ?? null,
-    state: data.state,
+    state: normalizeIssueState(data.state),
     url: data.html_url,
     author: data.user?.login ?? null,
     createdAt: data.created_at,
@@ -61,21 +65,22 @@ export async function createRepository(
   description: string | undefined,
   isPrivate: boolean
 ): Promise<GitHubRepository> {
-  return withRetry(async () => {
-    try {
-      logger.info("Creando repositorio", { name, isPrivate });
-      const octokit = getOctokitClient();
-      const { data } = await octokit.repos.createForAuthenticatedUser({
-        name,
-        ...(description !== undefined && { description }),
-        private: isPrivate,
-        auto_init: true,
-      });
-      return mapToRepository(data);
-    } catch (error) {
-      throw mapGitHubError(error, `El repositorio "${name}"`);
-    }
-  });
+  return withOperationLogging("createRepository", { name, isPrivate }, () =>
+    withRetry(async () => {
+      try {
+        const octokit = getOctokitClient();
+        const { data } = await octokit.repos.createForAuthenticatedUser({
+          name,
+          ...(description !== undefined && { description }),
+          private: isPrivate,
+          auto_init: true,
+        });
+        return mapToRepository(data);
+      } catch (error) {
+        throw mapGitHubError(error, `El repositorio "${name}"`);
+      }
+    })
+  );
 }
 
 export async function createIssue(
@@ -84,39 +89,41 @@ export async function createIssue(
   title: string,
   body: string | undefined
 ): Promise<GitHubIssue> {
-  return withRetry(async () => {
-    try {
-      logger.info("Creando issue", { owner, repo, title });
-      const octokit = getOctokitClient();
-      const { data } = await octokit.issues.create({
-        owner,
-        repo,
-        title,
-        ...(body !== undefined && { body }),
-      });
-      return mapToIssue(data);
-    } catch (error) {
-      throw mapGitHubError(error, `El repositorio "${owner}/${repo}"`);
-    }
-  });
+  return withOperationLogging("createIssue", { owner, repo, title }, () =>
+    withRetry(async () => {
+      try {
+        const octokit = getOctokitClient();
+        const { data } = await octokit.issues.create({
+          owner,
+          repo,
+          title,
+          ...(body !== undefined && { body }),
+        });
+        return mapToIssue(data);
+      } catch (error) {
+        throw mapGitHubError(error, `El repositorio "${owner}/${repo}"`);
+      }
+    })
+  );
 }
 
 export async function listRepositories(
   limit: number
 ): Promise<GitHubRepository[]> {
-  return withRetry(async () => {
-    try {
-      logger.info("Listando repositorios", { limit });
-      const octokit = getOctokitClient();
-      const { data } = await octokit.repos.listForAuthenticatedUser({
-        per_page: limit,
-        sort: "updated",
-      });
-      return data.map(mapToRepository);
-    } catch (error) {
-      throw mapGitHubError(error);
-    }
-  });
+  return withOperationLogging("listRepositories", { limit }, () =>
+    withRetry(async () => {
+      try {
+        const octokit = getOctokitClient();
+        const { data } = await octokit.repos.listForAuthenticatedUser({
+          per_page: limit,
+          sort: "updated",
+        });
+        return data.map(mapToRepository);
+      } catch (error) {
+        throw mapGitHubError(error);
+      }
+    })
+  );
 }
 
 export async function createCommit(
@@ -127,12 +134,12 @@ export async function createCommit(
   content: string,
   message: string
 ): Promise<GitHubCommit> {
-  return withRetry(async () => {
-    try {
-      logger.info("Creando commit", { owner, repo, branch, filePath });
-      const octokit = getOctokitClient();
+  return withOperationLogging("createCommit", { owner, repo, branch, filePath }, () =>
+    withRetry(async () => {
+      try {
+        const octokit = getOctokitClient();
 
-      const { data: refData } = await octokit.git.getRef({
+        const { data: refData } = await octokit.git.getRef({
         owner,
         repo,
         ref: `heads/${branch}`,
@@ -185,10 +192,11 @@ export async function createCommit(
         url: newCommit.html_url ?? `https://github.com/${owner}/${repo}/commit/${newCommit.sha}`,
         author: newCommit.author?.name ?? null,
       };
-    } catch (error) {
-      throw mapGitHubError(error, `El repositorio "${owner}/${repo}"`);
-    }
-  });
+      } catch (error) {
+        throw mapGitHubError(error, `El repositorio "${owner}/${repo}"`);
+      }
+    })
+  );
 }
 
 export async function listIssues(
@@ -197,23 +205,24 @@ export async function listIssues(
   state: "open" | "closed" | "all",
   limit: number
 ): Promise<GitHubIssue[]> {
-  return withRetry(async () => {
-    try {
-      logger.info("Listando issues", { owner, repo, state, limit });
-      const octokit = getOctokitClient();
-      const { data } = await octokit.issues.listForRepo({
-        owner,
-        repo,
-        state,
-        per_page: limit,
-      });
-      return data
-        .filter((issue) => !issue.pull_request)
-        .map(mapToIssue);
-    } catch (error) {
-      throw mapGitHubError(error, `El repositorio "${owner}/${repo}"`);
-    }
-  });
+  return withOperationLogging("listIssues", { owner, repo, state, limit }, () =>
+    withRetry(async () => {
+      try {
+        const octokit = getOctokitClient();
+        const { data } = await octokit.issues.listForRepo({
+          owner,
+          repo,
+          state,
+          per_page: limit,
+        });
+        return data
+          .filter((issue) => !issue.pull_request)
+          .map(mapToIssue);
+      } catch (error) {
+        throw mapGitHubError(error, `El repositorio "${owner}/${repo}"`);
+      }
+    })
+  );
 }
 
 export async function createBranch(
@@ -222,45 +231,49 @@ export async function createBranch(
   branchName: string,
   fromBranch: string | undefined
 ): Promise<GitHubBranch> {
-  return withRetry(async () => {
-    try {
-      logger.info("Creando rama", { owner, repo, branchName, fromBranch });
-      const octokit = getOctokitClient();
+  return withOperationLogging(
+    "createBranch",
+    { owner, repo, branchName, fromBranch },
+    () =>
+      withRetry(async () => {
+        try {
+          const octokit = getOctokitClient();
 
-      let baseSha: string;
+          let baseSha: string;
 
-      if (fromBranch !== undefined) {
-        const { data: refData } = await octokit.git.getRef({
-          owner,
-          repo,
-          ref: `heads/${fromBranch}`,
-        });
-        baseSha = refData.object.sha;
-      } else {
-        const { data: repoData } = await octokit.repos.get({ owner, repo });
-        const { data: refData } = await octokit.git.getRef({
-          owner,
-          repo,
-          ref: `heads/${repoData.default_branch}`,
-        });
-        baseSha = refData.object.sha;
-      }
+          if (fromBranch !== undefined) {
+            const { data: refData } = await octokit.git.getRef({
+              owner,
+              repo,
+              ref: `heads/${fromBranch}`,
+            });
+            baseSha = refData.object.sha;
+          } else {
+            const { data: repoData } = await octokit.repos.get({ owner, repo });
+            const { data: refData } = await octokit.git.getRef({
+              owner,
+              repo,
+              ref: `heads/${repoData.default_branch}`,
+            });
+            baseSha = refData.object.sha;
+          }
 
-      const { data } = await octokit.git.createRef({
-        owner,
-        repo,
-        ref: `refs/heads/${branchName}`,
-        sha: baseSha,
-      });
+          const { data } = await octokit.git.createRef({
+            owner,
+            repo,
+            ref: `refs/heads/${branchName}`,
+            sha: baseSha,
+          });
 
-      return {
-        name: branchName,
-        sha: data.object.sha,
-      };
-    } catch (error) {
-      throw mapGitHubError(error, `El repositorio "${owner}/${repo}"`);
-    }
-  });
+          return {
+            name: branchName,
+            sha: data.object.sha,
+          };
+        } catch (error) {
+          throw mapGitHubError(error, `El repositorio "${owner}/${repo}"`);
+        }
+      })
+  );
 }
 
 export async function closeIssue(
@@ -268,21 +281,22 @@ export async function closeIssue(
   repo: string,
   issueNumber: number
 ): Promise<GitHubIssue> {
-  return withRetry(async () => {
-    try {
-      logger.info("Cerrando issue", { owner, repo, issueNumber });
-      const octokit = getOctokitClient();
-      const { data } = await octokit.issues.update({
-        owner,
-        repo,
-        issue_number: issueNumber,
-        state: "closed",
-      });
-      return mapToIssue(data);
-    } catch (error) {
-      throw mapGitHubError(error, `El issue #${issueNumber} en "${owner}/${repo}"`);
-    }
-  });
+  return withOperationLogging("closeIssue", { owner, repo, issueNumber }, () =>
+    withRetry(async () => {
+      try {
+        const octokit = getOctokitClient();
+        const { data } = await octokit.issues.update({
+          owner,
+          repo,
+          issue_number: issueNumber,
+          state: "closed",
+        });
+        return mapToIssue(data);
+      } catch (error) {
+        throw mapGitHubError(error, `El issue #${issueNumber} en "${owner}/${repo}"`);
+      }
+    })
+  );
 }
 
 export async function addCommentToIssue(
@@ -291,27 +305,31 @@ export async function addCommentToIssue(
   issueNumber: number,
   body: string
 ): Promise<GitHubComment> {
-  return withRetry(async () => {
-    try {
-      logger.info("Agregando comentario al issue", { owner, repo, issueNumber });
-      const octokit = getOctokitClient();
-      const { data } = await octokit.issues.createComment({
-        owner,
-        repo,
-        issue_number: issueNumber,
-        body,
-      });
-      return {
-        id: data.id,
-        body: data.body ?? "",
-        url: data.html_url,
-        author: data.user?.login ?? null,
-        createdAt: data.created_at,
-      };
-    } catch (error) {
-      throw mapGitHubError(error, `El issue #${issueNumber} en "${owner}/${repo}"`);
-    }
-  });
+  return withOperationLogging(
+    "addCommentToIssue",
+    { owner, repo, issueNumber },
+    () =>
+      withRetry(async () => {
+        try {
+          const octokit = getOctokitClient();
+          const { data } = await octokit.issues.createComment({
+            owner,
+            repo,
+            issue_number: issueNumber,
+            body,
+          });
+          return {
+            id: data.id,
+            body: data.body ?? "",
+            url: data.html_url,
+            author: data.user?.login ?? null,
+            createdAt: data.created_at,
+          };
+        } catch (error) {
+          throw mapGitHubError(error, `El issue #${issueNumber} en "${owner}/${repo}"`);
+        }
+      })
+  );
 }
 
 export async function listCommits(
@@ -320,26 +338,30 @@ export async function listCommits(
   branch: string | undefined,
   limit: number
 ): Promise<GitHubCommit[]> {
-  return withRetry(async () => {
-    try {
-      logger.info("Listando commits", { owner, repo, branch, limit });
-      const octokit = getOctokitClient();
-      const { data } = await octokit.repos.listCommits({
-        owner,
-        repo,
-        ...(branch !== undefined && { sha: branch }),
-        per_page: limit,
-      });
-      return data.map((commit) => ({
-        sha: commit.sha,
-        message: commit.commit.message,
-        url: commit.html_url,
-        author: commit.commit.author?.name ?? null,
-      }));
-    } catch (error) {
-      throw mapGitHubError(error, `El repositorio "${owner}/${repo}"`);
-    }
-  });
+  return withOperationLogging(
+    "listCommits",
+    { owner, repo, branch, limit },
+    () =>
+      withRetry(async () => {
+        try {
+          const octokit = getOctokitClient();
+          const { data } = await octokit.repos.listCommits({
+            owner,
+            repo,
+            ...(branch !== undefined && { sha: branch }),
+            per_page: limit,
+          });
+          return data.map((commit) => ({
+            sha: commit.sha,
+            message: commit.commit.message,
+            url: commit.html_url,
+            author: commit.commit.author?.name ?? null,
+          }));
+        } catch (error) {
+          throw mapGitHubError(error, `El repositorio "${owner}/${repo}"`);
+        }
+      })
+  );
 }
 
 export async function createPullRequest(
@@ -350,31 +372,35 @@ export async function createPullRequest(
   head: string,
   base: string
 ): Promise<GitHubPullRequest> {
-  return withRetry(async () => {
-    try {
-      logger.info("Creando pull request", { owner, repo, title, head, base });
-      const octokit = getOctokitClient();
-      const { data } = await octokit.pulls.create({
-        owner,
-        repo,
-        title,
-        ...(body !== undefined && { body }),
-        head,
-        base,
-      });
-      return {
-        id: data.id,
-        number: data.number,
-        title: data.title,
-        url: data.html_url,
-        state: data.state,
-        sourceBranch: data.head.ref,
-        targetBranch: data.base.ref,
-      };
-    } catch (error) {
-      throw mapGitHubError(error, `El repositorio "${owner}/${repo}"`);
-    }
-  });
+  return withOperationLogging(
+    "createPullRequest",
+    { owner, repo, title, head, base },
+    () =>
+      withRetry(async () => {
+        try {
+          const octokit = getOctokitClient();
+          const { data } = await octokit.pulls.create({
+            owner,
+            repo,
+            title,
+            ...(body !== undefined && { body }),
+            head,
+            base,
+          });
+          return {
+            id: data.id,
+            number: data.number,
+            title: data.title,
+            url: data.html_url,
+            state: normalizeIssueState(data.state),
+            sourceBranch: data.head.ref,
+            targetBranch: data.base.ref,
+          };
+        } catch (error) {
+          throw mapGitHubError(error, `El repositorio "${owner}/${repo}"`);
+        }
+      })
+  );
 }
 
 export async function createLabel(
@@ -384,27 +410,31 @@ export async function createLabel(
   color: string,
   description: string | undefined
 ): Promise<GitHubLabel> {
-  return withRetry(async () => {
-    try {
-      logger.info("Creando label", { owner, repo, name, color });
-      const octokit = getOctokitClient();
-      const { data } = await octokit.issues.createLabel({
-        owner,
-        repo,
-        name,
-        color,
-        ...(description !== undefined && { description }),
-      });
-      return {
-        id: data.id,
-        name: data.name,
-        color: data.color,
-        description: data.description ?? null,
-      };
-    } catch (error) {
-      throw mapGitHubError(error, `El repositorio "${owner}/${repo}"`);
-    }
-  });
+  return withOperationLogging(
+    "createLabel",
+    { owner, repo, name, color },
+    () =>
+      withRetry(async () => {
+        try {
+          const octokit = getOctokitClient();
+          const { data } = await octokit.issues.createLabel({
+            owner,
+            repo,
+            name,
+            color,
+            ...(description !== undefined && { description }),
+          });
+          return {
+            id: data.id,
+            name: data.name,
+            color: data.color,
+            description: data.description ?? null,
+          };
+        } catch (error) {
+          throw mapGitHubError(error, `El repositorio "${owner}/${repo}"`);
+        }
+      })
+  );
 }
 
 export async function assignIssue(
@@ -413,21 +443,25 @@ export async function assignIssue(
   issueNumber: number,
   assignees: string[]
 ): Promise<GitHubIssue> {
-  return withRetry(async () => {
-    try {
-      logger.info("Asignando issue", { owner, repo, issueNumber, assignees });
-      const octokit = getOctokitClient();
-      const { data } = await octokit.issues.addAssignees({
-        owner,
-        repo,
-        issue_number: issueNumber,
-        assignees,
-      });
-      return mapToIssue(data);
-    } catch (error) {
-      throw mapGitHubError(error, `El issue #${issueNumber} en "${owner}/${repo}"`);
-    }
-  });
+  return withOperationLogging(
+    "assignIssue",
+    { owner, repo, issueNumber, assignees },
+    () =>
+      withRetry(async () => {
+        try {
+          const octokit = getOctokitClient();
+          const { data } = await octokit.issues.addAssignees({
+            owner,
+            repo,
+            issue_number: issueNumber,
+            assignees,
+          });
+          return mapToIssue(data);
+        } catch (error) {
+          throw mapGitHubError(error, `El issue #${issueNumber} en "${owner}/${repo}"`);
+        }
+      })
+  );
 }
 
 export async function addCollaborator(
@@ -436,18 +470,22 @@ export async function addCollaborator(
   username: string,
   permission: "pull" | "push" | "admin" | "maintain" | "triage"
 ): Promise<void> {
-  return withRetry(async () => {
-    try {
-      logger.info("Agregando colaborador", { owner, repo, username, permission });
-      const octokit = getOctokitClient();
-      await octokit.repos.addCollaborator({
-        owner,
-        repo,
-        username,
-        permission,
-      });
-    } catch (error) {
-      throw mapGitHubError(error, `El repositorio "${owner}/${repo}"`);
-    }
-  });
+  return withOperationLogging(
+    "addCollaborator",
+    { owner, repo, username, permission },
+    () =>
+      withRetry(async () => {
+        try {
+          const octokit = getOctokitClient();
+          await octokit.repos.addCollaborator({
+            owner,
+            repo,
+            username,
+            permission,
+          });
+        } catch (error) {
+          throw mapGitHubError(error, `El repositorio "${owner}/${repo}"`);
+        }
+      })
+  );
 }

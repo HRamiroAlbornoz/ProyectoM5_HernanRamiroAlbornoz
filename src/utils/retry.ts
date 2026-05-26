@@ -28,7 +28,7 @@ export async function withRetry<T>(
 ): Promise<T> {
   const { maxAttempts, baseDelayMs, maxDelayMs } = { ...DEFAULT_OPTIONS, ...options };
 
-  let lastError: AppError = mapGitHubError(new Error("Error desconocido"));
+  let lastError: AppError | undefined;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -54,5 +54,5 @@ export async function withRetry<T>(
     }
   }
 
-  throw lastError;
+  throw lastError ?? mapGitHubError(new Error("Error desconocido en withRetry."));
 }

@@ -15,6 +15,7 @@ import {
   addCommentToIssue,
   createBranch,
   listCommits,
+  createCommit,
 } from "../src/github/operations.js";
 
 const mockOctokit = {
@@ -310,5 +311,137 @@ describe("listCommits", () => {
     expect(result[0]?.sha).toBe("abc123def456ghi789");
     expect(result[0]?.message).toBe("feat: primera funcionalidad");
     expect(result[0]?.author).toBe("Hernán Albornoz");
+  });
+});
+
+describe("createCommit", () => {
+  function setupSuccessfulCommitMocks() {
+    mockOctokit.git.getRef.mockResolvedValue({
+      data: { object: { sha: "latest-sha-123" } },
+    });
+    mockOctokit.git.getCommit.mockResolvedValue({
+      data: { tree: { sha: "tree-sha-456" } },
+    });
+    mockOctokit.git.createBlob.mockResolvedValue({
+      data: { sha: "blob-sha-789" },
+    });
+    mockOctokit.git.createTree.mockResolvedValue({
+      data: { sha: "new-tree-sha-abc" },
+    });
+    mockOctokit.git.createCommit.mockResolvedValue({
+      data: {
+        sha: "new-commit-sha-def",
+        message: "Add new file",
+        html_url: "https://github.com/usuario/mi-repo/commit/new-commit-sha-def",
+        author: { name: "Hernán Albornoz" },
+      },
+    });
+    mockOctokit.git.updateRef.mockResolvedValue({ data: {} });
+  }
+
+  it("ejecuta el flujo completo y retorna el commit creado", async () => {
+    setupSuccessfulCommitMocks();
+
+    const result = await createCommit(
+      "usuario",
+      "mi-repo",
+      "main",
+      "src/index.ts",
+      "console.log('hola')",
+      "Add new file"
+    );
+
+    expect(result.sha).toBe("new-commit-sha-def");
+    expect(result.message).toBe("Add new file");
+    expect(result.author).toBe("Hernán Albornoz");
+    expect(result.url).toBe("https://github.com/usuario/mi-repo/commit/new-commit-sha-def");
+  });
+
+  it("encodea el contenido del archivo a base64 antes de crear el blob", async () => {
+    setupSuccessfulCommitMocks();
+
+    await createCommit("usuario", "mi-repo", "main", "src/index.ts", "hola mundo", "msg");
+
+    // "hola mundo" en base64
+    const expectedBase64 = "aG9sYSBtdW5kbw==";
+    expect(mockOctokit.git.createBlob).toHaveBeenCalledWith({
+      owner: "usuario",
+      repo: "mi-repo",
+      content: expectedBase64,
+      encoding: "base64",
+    });
+  });
+
+  it("actualiza la referencia de la rama con el nuevo commit SHA", async () => {
+    setupSuccessfulCommitMocks();
+
+    await createCommit("usuario", "mi-repo", "main", "src/index.ts", "contenido", "msg");
+
+    expect(mockOctokit.git.updateRef).toHaveBeenCalledWith({
+      owner: "usuario",
+      repo: "mi-repo",
+      ref: "heads/main",
+      sha: "new-commit-sha-def",
+    });
+  });
+
+  it("usa el árbol base correcto en createTree", async () => {
+    setupSuccessfulCommitMocks();
+
+    await createCommit("usuario", "mi-repo", "main", "src/index.ts", "contenido", "msg");
+
+    expect(mockOctokit.git.createTree).toHaveBeenCalledWith({
+      owner: "usuario",
+      repo: "mi-repo",
+      base_tree: "tree-sha-456",
+      tree: [
+        {
+          path: "src/index.ts",
+          mode: "100644",
+          type: "blob",
+          sha: "blob-sha-789",
+        },
+      ],
+    });
+  });
+
+  it("falla con GitHubAPIError cuando la rama no existe (404)", async () => {
+    mockOctokit.git.getRef.mockRejectedValue({ status: 404 });
+
+    const error = await createCommit(
+      "usuario",
+      "mi-repo",
+      "rama-inexistente",
+      "src/index.ts",
+      "contenido",
+      "msg"
+    ).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(GitHubAPIError);
+    expect((error as GitHubAPIError).message).toContain("no fue encontrado");
+  });
+
+  it("falla con AuthenticationError cuando el token es inválido (401)", async () => {
+    mockOctokit.git.getRef.mockRejectedValue({ status: 401 });
+
+    await expect(
+      createCommit("usuario", "mi-repo", "main", "src/index.ts", "contenido", "msg")
+    ).rejects.toBeInstanceOf(AuthenticationError);
+  });
+});
+
+describe("createBranch (casos de error)", () => {
+  it("falla con GitHubAPIError cuando fromBranch no existe (404)", async () => {
+    mockOctokit.git.getRef.mockRejectedValue({ status: 404 });
+
+    const error = await createBranch(
+      "usuario",
+      "mi-repo",
+      "feature/nueva",
+      "rama-inexistente"
+    ).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(GitHubAPIError);
+    expect((error as GitHubAPIError).retryable).toBe(false);
   });
 });

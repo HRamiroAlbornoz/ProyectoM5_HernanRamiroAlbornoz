@@ -19,7 +19,7 @@ export type GitHubIssue = {
   number: number;
   title: string;
   body: string | null;
-  state: string;
+  state: "open" | "closed";
   url: string;
   author: string | null;
   createdAt: string;
@@ -42,7 +42,7 @@ export type GitHubPullRequest = {
   number: number;
   title: string;
   url: string;
-  state: string;
+  state: "open" | "closed";
   sourceBranch: string;
   targetBranch: string;
 };
